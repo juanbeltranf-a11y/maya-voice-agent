@@ -3,7 +3,8 @@ title: Maya AI - Consejera y Psicologa
 emoji: 🧠
 colorFrom: indigo
 colorTo: purple
-sdk: docker
+sdk: gradio
+app_file: app.py
 pinned: false
 ---
 

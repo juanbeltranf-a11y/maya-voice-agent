@@ -1,5 +1,3 @@
-fastapi
-uvicorn[standard]
+gradio
 groq
 python-dotenv
-python-multipart
