@@ -17,10 +17,25 @@ app = FastAPI(title="WebRTC Voice Agent - Groq LPU")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 groq_client = Groq(api_key=GROQ_API_KEY)
 
+import re
+
+def clean_for_speech(text: str) -> str:
+    text = re.sub(r"\*+", "", text)
+    text = re.sub(r"`+", "", text)
+    text = re.sub(r"#+", "", text)
+    text = re.sub(r"[-_~]{2,}", "", text)
+    text = re.sub(r"^\s*[-•*]\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\s*[-•]\s*", ", ", text)
+    text = re.sub(r"[ \t]+", " ", text).strip()
+    return text
+
 SYSTEM_PROMPT = (
-    "Eres Maya, una asistente de voz conversacional inteligente en español con empatía, fluidez y calidez humana. "
-    "Respondes de forma clara, natural, expresiva y amena, sin rodeos innecesarios. "
-    "Tus respuestas son perfectas para ser escuchadas por voz, redactadas en un lenguaje coloquial agradable."
+    "Eres Maya, una psicóloga clínica, terapeuta y consejera emocional. "
+    "Tu ÚNICA Y EXCLUSIVA labor es escuchar, brindar orientación psicológica, contención emocional y consejos humanos ante situaciones de vida, estrés, ansiedad o problemas personales. "
+    "REGLA DE SEGURIDAD ESTRICTA: TIENES TERMINANTEMENTE PROHIBIDO responder dudas de programación, escribir código, corregir bugs de software, hablar de desarrollo web o resolver tareas técnicas. "
+    "Si alguien te pide código, ayuda técnica o cualquier tema ajeno a la salud mental, rechaza cortés y firmemente diciendo: "
+    "'Mi propósito es exclusivamente brindarte apoyo emocional y orientación psicológica. No tengo permitido resolver dudas técnicas ni programar código. ¿Hay alguna situación personal o emocional en la que te pueda acompañar hoy?' "
+    "NUNCA uses asteriscos, viñetas, markdown ni emojis. Tus respuestas serán escuchadas por voz, así que habla con naturalidad, cercanía y calidez humana."
 )
 
 @app.get("/")
@@ -238,6 +253,7 @@ def read_root():
       };
 
       recognition.onresult = (event) => {
+        if (isSpeaking) return; // Ignorar por completo si Maya está hablando
         let interimText = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
@@ -351,15 +367,24 @@ def read_root():
       if (spanishVoice) utterance.voice = spanishVoice;
 
       utterance.onstart = () => {
+        isSpeaking = true;
+        try { recognition.abort(); } catch(e) {} // Detener microfono para que NO capture su propia voz
         orbContainer.className = 'orb-container speaking';
         statusLabel.innerText = 'Maya está hablando...';
       };
 
       utterance.onend = () => {
         isSpeaking = false;
+        accumulatedTranscript = "";
+        clearTimeout(silenceTimer);
         orbContainer.className = 'orb-container listening';
         statusLabel.innerText = 'Te escucho... habla cuando gustes';
-        startListening();
+        // Esperar 400ms tras terminar el audio para reactivar el microfono limpio
+        setTimeout(() => {
+          if (isCalling && !isSpeaking) {
+            startListening();
+          }
+        }, 400);
       };
 
       synth.speak(utterance);
@@ -393,7 +418,7 @@ async def chat_with_groq(payload: dict):
             temperature=0.7,
             max_tokens=180
         )
-        reply = completion.choices[0].message.content.strip()
+        reply = clean_for_speech(completion.choices[0].message.content)
         return {"reply": reply}
     except Exception as e:
         logger.error(f"Error en Groq: {e}")
