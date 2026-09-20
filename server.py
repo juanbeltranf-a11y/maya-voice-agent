@@ -415,8 +415,8 @@ async def chat_with_groq(payload: dict):
         completion = groq_client.chat.completions.create(
             model="openai/gpt-oss-120b",
             messages=full_messages,
-            temperature=0.7,
-            max_tokens=180
+            temperature=0.6,
+            max_tokens=100
         )
         reply = clean_for_speech(completion.choices[0].message.content)
         return {"reply": reply}
